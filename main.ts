@@ -1,3 +1,35 @@
+function joy(): number[] {
+    //  Read joystick input using joy_cal calibration
+    
+    return [Math.map(pins.analogReadPin(AnalogPin.P1), joy_cal[0], joy_cal[1], 0, 1024), Math.map(pins.analogReadPin(AnalogPin.P2), joy_cal[2], joy_cal[3], 0, 1024)]
+}
+
+function get_gear(): number {
+    //  Get gear based on the calibrated joystick input
+    let [x, y] = joy()
+    if (y > 800) {
+        if (x > 800) {
+            return 1
+        } else if (x < 550 && x > 350) {
+            return 3
+        } else if (x < 200) {
+            return 5
+        }
+        
+    } else if (y < 200) {
+        if (x > 800) {
+            return 2
+        } else if (x < 550 && x > 350) {
+            return 4
+        } else if (x < 200) {
+            return 6
+        }
+        
+    }
+    
+    return 0
+}
+
 function shift(new_gear: number) {
     //  Avoid invalid gears
     if (new_gear > 6 || new_gear < 0) {
@@ -8,7 +40,10 @@ function shift(new_gear: number) {
     
     let old = ratio
     ratio = ratios[new_gear]
-    rev = old * rev / ratio
+    if (ratio) {
+        rev = old * rev / ratio
+    }
+    
     gear = new_gear
 }
 
@@ -31,7 +66,9 @@ gear = 1
 let ratio = 0
 let ratios = [0, 0.00357, 0.00714, 0.0107, 0.0143, 0.0179, 0.0257]
 music.setTempo(900)
-// music.change_tempo_by(1000)
+//  Optional joystick gearbox
+let joy_cal = [0, 1024, 0, 1024]
+let use_joystick = false
 basic.forever(function physics() {
     
     //  Exit conditions
@@ -111,4 +148,38 @@ basic.forever(function draw_hud() {
     for (i = 0; i < distance / 5; i++) {
         led.plot(4, i)
     }
+})
+basic.forever(function handle_joystick() {
+    //  When P15 is set to low, start the 5s calibration
+    //  then the joystick can be used as a gearshifter
+    
+    basic.pause(50)
+    //  calibration
+    if (!pins.digitalReadPin(DigitalPin.P15)) {
+        exit = true
+        basic.showString("C")
+        joy_cal = [9999, 0, 9999, 0]
+        for (let i = 0; i < 50; i++) {
+            joy_cal[0] = Math.min(joy_cal[0], pins.analogReadPin(AnalogPin.P1))
+            joy_cal[1] = Math.max(joy_cal[1], pins.analogReadPin(AnalogPin.P1))
+            joy_cal[2] = Math.min(joy_cal[2], pins.analogReadPin(AnalogPin.P2))
+            joy_cal[3] = Math.max(joy_cal[3], pins.analogReadPin(AnalogPin.P2))
+            basic.pause(100)
+        }
+        basic.showString("O")
+        exit = false
+        use_joystick = true
+    }
+    
+    //  skip the rest when joystick not calibrated
+    if (!use_joystick) {
+        return
+    }
+    
+    //  only update gear when not on neutral
+    let new_gear = get_gear()
+    if (new_gear && gear != new_gear) {
+        shift(new_gear)
+    }
+    
 })

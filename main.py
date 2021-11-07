@@ -1,3 +1,28 @@
+def joy():
+    # Read joystick input using joy_cal calibration
+    global joy_cal
+    return Math.map(pins.analog_read_pin(AnalogPin.P1), joy_cal[0], joy_cal[1], 0, 1024), Math.map(pins.analog_read_pin(AnalogPin.P2), joy_cal[2], joy_cal[3], 0, 1024)
+
+def get_gear():
+    # Get gear based on the calibrated joystick input
+    x, y = joy()
+    if y > 800:
+        if x > 800:
+            return 1
+        elif x < 550 and x > 350:
+            return 3
+        elif x < 200:
+            return 5
+    elif y < 200:
+        if x > 800:
+            return 2
+        elif x < 550 and x > 350:
+            return 4
+        elif x < 200:
+            return 6
+    return 0
+
+
 def shift(new_gear):
     # Avoid invalid gears
     if new_gear > 6 or new_gear < 0:
@@ -6,7 +31,8 @@ def shift(new_gear):
     global gear, ratio, ratios, rev
     old = ratio
     ratio = ratios[new_gear]
-    rev = old * rev / ratio
+    if ratio:
+        rev = old * rev / ratio
     gear = new_gear
 
 def shift_up():
@@ -30,7 +56,9 @@ gear = 1
 ratio = 0
 ratios: List[number] = [0, 0.00357, 0.00714, 0.0107, 0.0143, 0.0179, 0.0257]
 music.set_tempo(900)
-#music.change_tempo_by(1000)
+# Optional joystick gearbox
+joy_cal = [0, 1024, 0, 1024]
+use_joystick = False
 
 def physics():
     global rev, speed, distance, gear, ratio, exit
@@ -96,3 +124,32 @@ def draw_hud():
     for i in range((distance / 5)):
         led.plot(4, i)
 basic.forever(draw_hud)
+
+def handle_joystick():
+    # When P15 is set to low, start the 5s calibration
+    # then the joystick can be used as a gearshifter
+    global joy_cal, use_joystick, exit
+    basic.pause(50)
+    # calibration
+    if not pins.digital_read_pin(DigitalPin.P15):
+        exit = True
+        basic.show_string("C")
+        joy_cal = [9999, 0, 9999, 0]
+        for i in range(50):
+            joy_cal[0] = min(joy_cal[0], pins.analog_read_pin(AnalogPin.P1))
+            joy_cal[1] = max(joy_cal[1], pins.analog_read_pin(AnalogPin.P1))
+            joy_cal[2] = min(joy_cal[2], pins.analog_read_pin(AnalogPin.P2))
+            joy_cal[3] = max(joy_cal[3], pins.analog_read_pin(AnalogPin.P2))
+            basic.pause(100)
+        basic.show_string("O")
+        exit = False
+        use_joystick = True
+    # skip the rest when joystick not calibrated
+    if not use_joystick:
+        return
+    # only update gear when not on neutral
+    new_gear = get_gear()
+    if new_gear and gear != new_gear:
+        shift(new_gear)
+
+basic.forever(handle_joystick)
