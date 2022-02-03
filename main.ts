@@ -149,7 +149,7 @@ basic.forever(function draw_hud() {
         led.plot(4, i)
     }
 })
-basic.forever(function handle_joystick() {
+function handle_joystick() {
     //  When P15 is set to low, start the 5s calibration
     //  then the joystick can be used as a gearshifter
     
@@ -182,4 +182,5 @@ basic.forever(function handle_joystick() {
         shift(new_gear)
     }
     
-})
+}
+

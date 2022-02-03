@@ -152,4 +152,4 @@ def handle_joystick():
     if new_gear and gear != new_gear:
         shift(new_gear)
 
-basic.forever(handle_joystick)
+#basic.forever(handle_joystick)
